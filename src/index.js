@@ -1,7 +1,9 @@
+// Em src/index.js ou src/main.jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
 import App from './App';
+import 'bootstrap/dist/css/bootstrap.min.css'; // <-- Adicione esta linha!
+import './index.css'; // Seu CSS customizado, se houver
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
