@@ -3,8 +3,8 @@ import { format, subMonths } from 'date-fns';
 import { BoxplotWeather } from './components/BoxplotWeather';
 import { LineChartWeather } from './components/LineChartWeather';
 import { fetchWeatherData } from './repo/openMeteo';
+import { fetchCoordinates } from './repo/openstreet';
 
-// Importando componentes do React-Bootstrap
 import {
   Container,
   Row,
@@ -29,19 +29,18 @@ import {
   FaCity,
 } from 'react-icons/fa';
 
-// Estilos inline para customização do tema dark
 const styles = {
   body: {
-    backgroundColor: '#1a1a2e', // Fundo azul escuro profundo
+    backgroundColor: '#1a1a2e',
     color: '#e0e0e0',
     minHeight: '100vh',
   },
   card: {
-    backgroundColor: '#242a42', // Cor do card um pouco mais clara
+    backgroundColor: '#242a42',
     border: '1px solid #4f5b82',
     borderRadius: '15px',
     boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-    backdropFilter: 'blur(5px)', // Efeito de vidro (opcional)
+    backdropFilter: 'blur(5px)',
   },
   cardHeader: {
     backgroundColor: 'transparent',
@@ -59,14 +58,6 @@ function App() {
   const [locationInfo, setLocationInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Funções de busca de dados (permanecem as mesmas)
-  const fetchCoordinates = async (place) => {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(place)}&format=json&limit=1`;
-    const res = await fetch(url);
-    const results = await res.json();
-    return results.length > 0 ? results[0] : null;
-  };
 
   const loadData = async (place) => {
     setLoading(true);
@@ -90,7 +81,6 @@ function App() {
   useEffect(() => {
     document.body.style.backgroundColor = styles.body.backgroundColor;
     loadData(city);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = (e) => {
