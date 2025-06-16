@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { format, subMonths } from 'date-fns';
+import { format, subMonths, subDays, subWeeks, subYears } from 'date-fns';
 import { BoxplotWeather } from './components/BoxplotWeather';
 import { LineChartWeather } from './components/LineChartWeather';
 import { fetchWeatherData } from './repo/openMeteo';
@@ -15,9 +15,10 @@ import {
   Spinner,
   Alert,
   InputGroup,
+  Dropdown,
+  ButtonGroup,
 } from 'react-bootstrap';
 
-// Importando ícones
 import {
   FaSearch,
   FaMapMarkerAlt,
@@ -27,6 +28,8 @@ import {
   FaBoxOpen,
   FaExclamationTriangle,
   FaCity,
+  FaCalendarAlt,
+  FaClock,
 } from 'react-icons/fa';
 
 const styles = {
@@ -52,6 +55,16 @@ const styles = {
   accentColor: '#00aaff',
 };
 
+const timeIntervals = [
+  { label: '1 Semana', value: '1week', days: 7 },
+  { label: '2 Semanas', value: '2weeks', days: 14 },
+  { label: '1 Mês', value: '1month', days: 30 },
+  { label: '3 Meses (Padrão)', value: '3months', days: 90 },
+  { label: '6 Meses', value: '6months', days: 180 },
+  { label: '1 Ano', value: '1year', days: 365 },
+  { label: 'Personalizado', value: 'custom', days: null },
+];
+
 function App() {
   const [city, setCity] = useState('Lisboa');
   const [data, setData] = useState(null);
@@ -59,9 +72,53 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const loadData = async (place) => {
+  const [selectedInterval, setSelectedInterval] = useState('3months');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [showCustomDates, setShowCustomDates] = useState(false);
+
+  const calculateDates = (intervalValue) => {
+    const endDate = new Date();
+    let startDate;
+
+    switch (intervalValue) {
+      case '1week':
+        startDate = subDays(endDate, 7);
+        break;
+      case '2weeks':
+        startDate = subDays(endDate, 14);
+        break;
+      case '1month':
+        startDate = subMonths(endDate, 1);
+        break;
+      case '3months':
+        startDate = subMonths(endDate, 3);
+        break;
+      case '6months':
+        startDate = subMonths(endDate, 6);
+        break;
+      case '1year':
+        startDate = subYears(endDate, 1);
+        break;
+      case 'custom':
+        return {
+          start: customStartDate,
+          end: customEndDate || format(endDate, 'yyyy-MM-dd')
+        };
+      default:
+        startDate = subMonths(endDate, 3);
+    }
+
+    return {
+      start: format(startDate, 'yyyy-MM-dd'),
+      end: format(endDate, 'yyyy-MM-dd')
+    };
+  };
+
+  const loadData = async (place, intervalValue = selectedInterval) => {
     setLoading(true);
     setError('');
+
     const location = await fetchCoordinates(place);
     if (!location) {
       setError('Cidade não encontrada. Tente um nome diferente ou mais específico.');
@@ -70,11 +127,50 @@ function App() {
       setLocationInfo(null);
       return;
     }
+
     setLocationInfo(location);
-    const start = format(subMonths(new Date(), 3), 'yyyy-MM-dd');
-    const end = format(new Date(), 'yyyy-MM-dd');
-    const weather = await fetchWeatherData(parseFloat(location.lat), parseFloat(location.lon), start, end);
-    setData(weather);
+
+    if (intervalValue === 'custom') {
+      if (!customStartDate) {
+        setError('Por favor, selecione uma data de início para o período personalizado.');
+        setLoading(false);
+        return;
+      }
+
+      const startDateObj = new Date(customStartDate);
+      const endDateObj = new Date(customEndDate || new Date());
+
+      if (startDateObj >= endDateObj) {
+        setError('A data de início deve ser anterior à data de fim.');
+        setLoading(false);
+        return;
+      }
+
+      const diffTime = Math.abs(endDateObj - startDateObj);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays > 730) {
+        setError('O período selecionado não pode exceder 2 anos.');
+        setLoading(false);
+        return;
+      }
+    }
+
+    const dates = calculateDates(intervalValue);
+
+    try {
+      const weather = await fetchWeatherData(
+        parseFloat(location.lat),
+        parseFloat(location.lon),
+        dates.start,
+        dates.end
+      );
+      setData(weather);
+    } catch (err) {
+      setError('Erro ao carregar dados meteorológicos. Tente novamente.');
+      console.error('Erro ao carregar dados:', err);
+    }
+
     setLoading(false);
   };
 
@@ -87,6 +183,30 @@ function App() {
     e.preventDefault();
     if (city.trim()) loadData(city);
   };
+
+  const handleIntervalChange = (intervalValue) => {
+    setSelectedInterval(intervalValue);
+    setShowCustomDates(intervalValue === 'custom');
+
+    if (intervalValue !== 'custom' && data) {
+      loadData(city, intervalValue);
+    }
+  };
+
+  const handleCustomDateSubmit = () => {
+    if (customStartDate && data) {
+      loadData(city, 'custom');
+    }
+  };
+
+  const getCurrentIntervalLabel = () => {
+    const interval = timeIntervals.find(i => i.value === selectedInterval);
+    return interval ? interval.label : 'Intervalo';
+  };
+
+  const maxDate = format(new Date(), 'yyyy-MM-dd');
+
+  const minDate = format(subYears(new Date(), 2), 'yyyy-MM-dd');
 
   return (
     <div style={styles.body}>
@@ -101,7 +221,7 @@ function App() {
         <Row className="justify-content-center mb-4">
           <Col md={8} lg={6}>
             <Form onSubmit={handleSubmit}>
-              <InputGroup>
+              <InputGroup className="mb-3">
                 <InputGroup.Text style={{ ...styles.card, borderRight: 0 }}>
                   <FaCity color={styles.accentColor} />
                 </InputGroup.Text>
@@ -114,7 +234,12 @@ function App() {
                   style={{ ...styles.card, borderLeft: 0, color: '#fff' }}
                   className="shadow-none"
                 />
-                <Button variant="primary" type="submit" disabled={loading} style={{ backgroundColor: styles.accentColor, borderColor: styles.accentColor }}>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={loading}
+                  style={{ backgroundColor: styles.accentColor, borderColor: styles.accentColor }}
+                >
                   {loading ? (
                     <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
                   ) : (
@@ -123,6 +248,98 @@ function App() {
                   <span className="ms-2 d-none d-md-inline">{loading ? 'Buscando...' : 'Buscar'}</span>
                 </Button>
               </InputGroup>
+
+              {/* Controles de Intervalo de Tempo */}
+              <Row className="align-items-end">
+                <Col md={showCustomDates ? 12 : 12}>
+                  <Form.Label className="text-white-50 mb-2">
+                    <FaClock className="me-2" />
+                    Período de Dados
+                  </Form.Label>
+                  <Dropdown as={ButtonGroup} className="w-100">
+                    <Button
+                      variant="outline-primary"
+                      style={{
+                        backgroundColor: styles.card.backgroundColor,
+                        borderColor: styles.accentColor,
+                        color: styles.accentColor
+                      }}
+                      className="text-start flex-grow-1"
+                    >
+                      <FaCalendarAlt className="me-2" />
+                      {getCurrentIntervalLabel()}
+                    </Button>
+                    <Dropdown.Toggle
+                      split
+                      variant="outline-primary"
+                      style={{
+                        backgroundColor: styles.card.backgroundColor,
+                        borderColor: styles.accentColor,
+                        color: styles.accentColor
+                      }}
+                    />
+                    <Dropdown.Menu style={styles.card}>
+                      {timeIntervals.map((interval) => (
+                        <Dropdown.Item
+                          key={interval.value}
+                          onClick={() => handleIntervalChange(interval.value)}
+                          active={selectedInterval === interval.value}
+                          style={{
+                            backgroundColor: selectedInterval === interval.value ? styles.accentColor : 'transparent',
+                            color: selectedInterval === interval.value ? '#fff' : '#e0e0e0'
+                          }}
+                        >
+                          {interval.label}
+                        </Dropdown.Item>
+                      ))}
+                    </Dropdown.Menu>
+                  </Dropdown>
+                </Col>
+              </Row>
+
+              {/* Campos de Data Personalizada */}
+              {showCustomDates && (
+                <Row className="mt-3">
+                  <Col md={6}>
+                    <Form.Label className="text-white-50 mb-1">Data de Início</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      min={minDate}
+                      max={maxDate}
+                      style={{ ...styles.card, color: '#fff' }}
+                      className="shadow-none"
+                      required
+                    />
+                  </Col>
+                  <Col md={6}>
+                    <Form.Label className="text-white-50 mb-1">Data de Fim (opcional)</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      min={customStartDate || minDate}
+                      max={maxDate}
+                      style={{ ...styles.card, color: '#fff' }}
+                      className="shadow-none"
+                    />
+                  </Col>
+                  <Col xs={12} className="mt-2">
+                    <Button
+                      variant="outline-primary"
+                      onClick={handleCustomDateSubmit}
+                      disabled={!customStartDate || loading}
+                      style={{
+                        borderColor: styles.accentColor,
+                        color: styles.accentColor
+                      }}
+                    >
+                      Aplicar Período Personalizado
+                    </Button>
+                  </Col>
+                </Row>
+              )}
             </Form>
           </Col>
         </Row>
@@ -152,8 +369,16 @@ function App() {
                 <h2 className="h4" style={{ color: styles.accentColor }}>{locationInfo.name}</h2>
                 <p className="mb-1 text-white-50">{locationInfo.display_name}</p>
                 <Row className="mt-3">
-                  <Col className='text-white-50' md={6}><strong>Latitude:</strong> {locationInfo.lat}</Col>
-                  <Col className='text-white-50' md={6}><strong>Longitude:</strong> {locationInfo.lon}</Col>
+                  <Col className='text-white-50' md={4}><strong>Latitude:</strong> {locationInfo.lat}</Col>
+                  <Col className='text-white-50' md={4}><strong>Longitude:</strong> {locationInfo.lon}</Col>
+                  <Col className='text-white-50' md={4}>
+                    <strong>Período:</strong> {getCurrentIntervalLabel()}
+                    {selectedInterval === 'custom' && customStartDate && (
+                      <small className="d-block">
+                        {customStartDate} até {customEndDate || 'hoje'}
+                      </small>
+                    )}
+                  </Col>
                 </Row>
               </Card.Body>
             </Card>
