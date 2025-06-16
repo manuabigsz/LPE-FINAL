@@ -1,7 +1,8 @@
 # Clima Vision - Dashboard Meteorológico Interativo
 
-![Clima Vision Screenshot](https://i.imgur.com/uR1yR5k.png)
-*(Recomendo que você substitua o link acima por um screenshot real do seu projeto em execução!)*
+# o sistema pode ser acessado pela url abaixo:
+https://lpe-final.vercel.app/
+
 
 ## 📖 Sobre o Projeto
 
@@ -100,6 +101,8 @@ A estrutura de arquivos principal da aplicação está organizada da seguinte fo
 |-- package.json
 `-- README.md
 ```
+
+
 ## 👨‍💻 Contato
 
 <p>
